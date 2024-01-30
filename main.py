@@ -19,6 +19,7 @@ driver = webdriver.Chrome()
 driver.get(s.url)
 scratched_values = list()
 
+start_time = time.time()
 for key, mark in m.marks.items():
     try:
         scratched_values.append(driver.find_element(By.XPATH, mark).text)
@@ -43,4 +44,5 @@ except NoSuchElementException:
     print("table not found")
 
 df = pd.DataFrame(data, columns=column_names)
+print(f"time: {finish_time - start_time}")
 print(df)
