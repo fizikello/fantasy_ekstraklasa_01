@@ -157,11 +157,12 @@ def get_new_players():
     return players_list
 
 
-def scrap_data():
+def scrap_data(path):
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_experimental_option("detach", True)
     # driver = webdriver.Edge()
     driver = webdriver.Chrome()
+    driver.get(path)
     start_time = time.time()
     for key, mark in m.marks.items():
         try:
@@ -241,9 +242,16 @@ for player in current_players:
         update_players_to_database([player[0], player[1], formatted_date, player[2]])
 
 
+for index in current_indexes:
+    print(index)
+    scratched_values = list()
+    path = s.login_url + "player/" + str(index)
+    print(path)
+    df = scrap_data(path)
+    print(df)
 
-#driver.get(s.test_url)
-scratched_values = list()
+
+
 
 """
 df = scrap_data()
