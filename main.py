@@ -1,4 +1,6 @@
 import time
+from datetime import date
+import re
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,7 +12,77 @@ from hidden_values import Secrets
 from marks import Marks
 import psycopg2
 
-s = Secrets()
+get_real_data = False
+
+def add_players_to_database(row_data):
+    try:
+        connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
+        # print(f"Connected to the database {s.dbname}")
+        cursor = connection.cursor()
+        sql_command = f'INSERT INTO players ("ID", "LAST_NAME", "YOUNG_PLAYER", "UPDATE_DATE") VALUES (%s, %s, %s, %s);'
+        cursor.execute(sql_command, row_data)
+        connection.commit()
+
+
+    except psycopg2.Error as e:
+        print(f"Unable to connect to the database {s.dbname}")
+        print(e)
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+           # print(f"Connection closed {s.dbname}")
+
+
+def update_players_to_database(row_data):
+    try:
+        connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
+        # print(f"Connected to the database {s.dbname}")
+        cursor = connection.cursor()
+        sql_command = f'UPDATE players SET "LAST_NAME"= %s, "YOUNG_PLAYER"=%s, "UPDATE_DATE"=%s WHERE "ID"=%s;'
+        cursor.execute(sql_command, row_data)
+        connection.commit()
+        #sql_command = "SELECT * FROM players;"
+        #cursor.execute(sql_command)
+        #results = cursor.fetchall()
+        #for row in results:
+        #    print(row)
+
+    except psycopg2.Error as e:
+        print(f"Unable to connect to the database {s.dbname}")
+        print(e)
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+            #print(f"Connection closed {s.dbname}")
+
+def get_players_from_database():
+
+    try:
+        connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
+        print(f"Connected to the database {s.dbname}")
+        cursor = connection.cursor()
+        sql_command = 'SELECT DISTINCT "ID" FROM players;'
+        cursor.execute(sql_command)
+        results = [entry[0] for entry in cursor.fetchall()]
+        return results
+
+    except psycopg2.Error as e:
+        print(f"Unable to connect to the database {s.dbname}")
+        print(e)
+        return list()
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+            print(f"Connection closed {s.dbname}")
 
 def connect_to_database():
     try:
@@ -23,8 +95,8 @@ def connect_to_database():
         for row in results:
             print(row)
 
-        test_row = (7, 'test player')
-        sql_command = f'INSERT INTO players ("ID", "FULL_NAME") VALUES (%s, %s)';
+        test_row = (8, 'test player', 'false')
+        sql_command = f'INSERT INTO players ("ID", "LAST_NAME", "YOUNG_PLAYER") VALUES (%s, %s, %s)';
         cursor.execute(sql_command, test_row)
         connection.commit()
         sql_command = "SELECT * FROM players;"
@@ -44,7 +116,12 @@ def connect_to_database():
             connection.close()
             print(f"Connection closed {s.dbname}")
 
+
 def get_new_players():
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_experimental_option("detach", True)
+    # driver = webdriver.Edge()
+    driver = webdriver.Chrome()
     start_date = time.time()
     driver.get(s.login_url)
     # test section
@@ -81,6 +158,10 @@ def get_new_players():
 
 
 def scrap_data():
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_experimental_option("detach", True)
+    # driver = webdriver.Edge()
+    driver = webdriver.Chrome()
     start_time = time.time()
     for key, mark in m.marks.items():
         try:
@@ -110,16 +191,59 @@ def scrap_data():
     print(f"time: {time.time() - start_time}")
     return pd.DataFrame(data, columns=column_names)
 
+
+def get_test_list():
+
+    with open('test_players.txt', 'r', encoding='utf-8') as file:
+        file_content = file.read().splitlines()
+
+    restored_list = list(map(str, file_content))
+    return restored_list
+
+
+def compare_lists(current_list, archive_list):
+    unique_values = set(current_list) - set(archive_list)
+    result_list = list(unique_values)
+    return result_list
+
+
 # connect_to_database()
 m = Marks()
-
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_experimental_option("detach", True)
+s = Secrets()
+#chrome_options = webdriver.ChromeOptions()
+#chrome_options.add_experimental_option("detach", True)
 # driver = webdriver.Edge()
-driver = webdriver.Chrome()
-current_players_list = get_new_players()
+#driver = webdriver.Chrome()
+
+archive_players_list = get_players_from_database()
+print(archive_players_list)
+current_players_list = get_new_players() if get_real_data else get_test_list()
+print(current_players_list)
+
+current_indexes = [int(row.split(':')[1]) for row in current_players_list]
+print(current_indexes)
+
+cp = compare_lists(current_list=current_indexes, archive_list=archive_players_list)
+
+# transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
+current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
+print(current_players)
+
+today = date.today()
+formatted_date = today.strftime('%Y%m%d')
+print(formatted_date)
+
+
+for player in current_players:
+    if player[2] in cp:
+        add_players_to_database([player[2], player[0], player[1], formatted_date])
+    else:
+        update_players_to_database([player[0], player[1], formatted_date, player[2]])
+
+
+
 #driver.get(s.test_url)
-#scratched_values = list()
+scratched_values = list()
 
 """
 df = scrap_data()
