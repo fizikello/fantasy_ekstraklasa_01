@@ -14,6 +14,31 @@ import psycopg2
 
 get_real_data = False
 
+def add_details_to_database(row_data):
+    try:
+        connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
+        # print(f"Connected to the database {s.dbname}")
+        cursor = connection.cursor()
+        sql_command = f'INSERT INTO players ("WEEKDAY","OPPOSITE_TEAM","MINUTES_PLAYED","GOALS_SCORED","ASSISTS",' \
+                      f'"ASSISTS_LOTTO","OWN_GOALS","PENALTIES_SCORED","PENALTIES_GAINED","PENALTIES_LOST",' \
+                      f'"PENALTIES_MISSED","PENALTIES_SAVED","BEST_XI","YELLOW_CARDS","RED_CARDS","POINTS",' \
+                      f'"PLAYER_INDEX") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+        cursor.execute(sql_command, row_data)
+        connection.commit()
+
+
+    except psycopg2.Error as e:
+        print(f"Unable to connect to the database {s.dbname}")
+        print(e)
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+           # print(f"Connection closed {s.dbname}")
+
+
 def add_players_to_database(row_data):
     try:
         connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
@@ -163,10 +188,11 @@ def scrap_data(path):
     # driver = webdriver.Edge()
     driver = webdriver.Chrome()
     driver.get(path)
+    scrapped_values = dict()
     start_time = time.time()
     for key, mark in m.marks.items():
         try:
-            scratched_values.append(driver.find_element(By.XPATH, mark).text)
+            scrapped_values[key] = driver.find_element(By.XPATH, mark).text
         except NoSuchElementException:
             print(f"Not found {key} markup")
             exit()
@@ -181,16 +207,24 @@ def scrap_data(path):
         column_names[-3] = "Yellow_Cards"
         column_names[-2] = "Red_Cards"
 
+        # first row contains header
         for row in rows[1:]:
             cols = row.find_elements(By.TAG_NAME, "td")
             row_data = [col.text for col in cols]
+            # add new table -> archive_stats
+            if len(row_data) == 15:
+                row_data.insert(1, 'EMPTY')
             data.append(row_data)
+
     except NoSuchElementException:
         print("table not found")
 
-    print(column_names)
-    print(f"time: {time.time() - start_time}")
-    return pd.DataFrame(data, columns=column_names)
+    #print(column_names)
+    #print(f"time: {round(time.time() - start_time),2}")
+
+    spdf = pd.DataFrame(data, columns=column_names)
+    # spdf["ELAPSED_TIME"] = round((time.time() - start_time), 2)
+    return spdf, scrapped_values
 
 
 def get_test_list():
@@ -217,40 +251,69 @@ s = Secrets()
 #driver = webdriver.Chrome()
 
 archive_players_list = get_players_from_database()
-print(archive_players_list)
+# print(archive_players_list)
 current_players_list = get_new_players() if get_real_data else get_test_list()
-print(current_players_list)
+# print(current_players_list)
 
 current_indexes = [int(row.split(':')[1]) for row in current_players_list]
-print(current_indexes)
+# print(current_indexes)
 
 cp = compare_lists(current_list=current_indexes, archive_list=archive_players_list)
 
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
 current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
-print(current_players)
+print(f"current_players: {current_players}")
 
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
-print(formatted_date)
+#print(formatted_date)
 
-
+# database -> players
 for player in current_players:
     if player[2] in cp:
         add_players_to_database([player[2], player[0], player[1], formatted_date])
     else:
         update_players_to_database([player[0], player[1], formatted_date, player[2]])
 
+# scrap website
+df = pd.DataFrame()
+df2 = pd.DataFrame(columns=['name', 'price', 'club_position', 'popularity', 'country', 'previous_club', 'sum_points', 'sum_goals', 'sum_assists'])
 
-for index in current_indexes:
-    print(index)
-    scratched_values = list()
-    path = s.login_url + "player/" + str(index)
-    print(path)
-    df = scrap_data(path)
+get_real_data_2 = True
+if get_real_data_2:
+    for index in current_indexes:
+        print(index)
+        path = s.login_url + "player/" + str(index)
+        #print(path)
+        tmp_df, tmp_pop_database = scrap_data(path)
+        # move to transform
+        new_column_names = {'Kol.':'WEEKDAY', 'Vs':"OPPOSITE_TEAM", 'Min.':"MINUTES_PLAYED", 'Br.':"GOALS_SCORED",
+                            'As.':'ASSISTS', 'AL.':"ASSISTS_LOTTO", 'Br. sam.':'OWN_GOALS', 'Kar. wyk.':"PENALTIES_SCORED", 'Kar. wyw.':'PENALTIES_GAINED',
+                            'Kar. spo.':'PENALTIES_LOST', 'Kar. zmar.':'PENALTIES_MISSED', 'Kar. obr.':'PENALTIES_SAVED', '11 kol.':"BEST_XI",
+                            'Yellow_Cards':"YELLOW_CARDS", 'Red_Cards':'RED_CARDS', 'Pkt.':"POINTS"}
+        tmp_df=tmp_df.rename(columns=new_column_names)
+        tmp_df['PLAYER_INDEX'] = index
+        df = pd.concat([df, tmp_df], ignore_index=True)
+        # print(tmp_df)
+        print(tmp_pop_database)
+        tmp_pop_database["PLAYER_INDEX"] = int(index)
+        df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
+
+else:
+    df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
     print(df)
 
+if not get_real_data:
+    df.to_csv("dataframe-test.csv", index=False)
 
+df2.to_csv("dataframe2-test.csv", index=True)
+
+# TRANSFORM
+
+# transform details
+# transform popularity
+
+# LOAD
 
 
 """
