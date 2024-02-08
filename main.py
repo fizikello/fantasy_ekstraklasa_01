@@ -11,8 +11,22 @@ from selenium.common.exceptions import NoSuchElementException
 from hidden_values import Secrets
 from marks import Marks
 import psycopg2
+from sqlalchemy import create_engine
 
-get_real_data = False
+get_real_data = True
+
+
+def add_or_update_details(df):
+
+    engine = create_engine(f'postgresql+psycopg2://{s.user}:{s.password}@{s.host}:{s.port}/{s.dbname}')
+    df.to_sql(name='details', con=engine, if_exists='append', index=False)
+
+
+def add_or_update_popularity(df):
+
+    engine = create_engine(f'postgresql+psycopg2://{s.user}:{s.password}@{s.host}:{s.port}/{s.dbname}')
+    df.to_sql(name='popularity', con=engine, if_exists='append', index=False)
+
 
 def add_details_to_database(row_data):
     try:
@@ -183,11 +197,12 @@ def get_new_players():
 
 
 def scrap_data(path):
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_experimental_option("detach", True)
+    #chrome_options = webdriver.ChromeOptions()
+    #chrome_options.add_experimental_option("detach", True)
     # driver = webdriver.Edge()
-    driver = webdriver.Chrome()
+    #driver = webdriver.Chrome()
     driver.get(path)
+    time.sleep(1)
     scrapped_values = dict()
     start_time = time.time()
     for key, mark in m.marks.items():
@@ -223,6 +238,7 @@ def scrap_data(path):
     #print(f"time: {round(time.time() - start_time),2}")
 
     spdf = pd.DataFrame(data, columns=column_names)
+    # spdf = spdf.fillna(value=0)
     # spdf["ELAPSED_TIME"] = round((time.time() - start_time), 2)
     return spdf, scrapped_values
 
@@ -245,10 +261,10 @@ def compare_lists(current_list, archive_list):
 # connect_to_database()
 m = Marks()
 s = Secrets()
-#chrome_options = webdriver.ChromeOptions()
-#chrome_options.add_experimental_option("detach", True)
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_experimental_option("detach", True)
 # driver = webdriver.Edge()
-#driver = webdriver.Chrome()
+driver = webdriver.Chrome()
 
 archive_players_list = get_players_from_database()
 # print(archive_players_list)
@@ -282,7 +298,7 @@ df2 = pd.DataFrame(columns=['name', 'price', 'club_position', 'popularity', 'cou
 get_real_data_2 = True
 if get_real_data_2:
     for index in current_indexes:
-        print(index)
+        print(f'{current_indexes.index(index)} : {index} ')
         path = s.login_url + "player/" + str(index)
         #print(path)
         tmp_df, tmp_pop_database = scrap_data(path)
@@ -293,9 +309,10 @@ if get_real_data_2:
                             'Yellow_Cards':"YELLOW_CARDS", 'Red_Cards':'RED_CARDS', 'Pkt.':"POINTS"}
         tmp_df=tmp_df.rename(columns=new_column_names)
         tmp_df['PLAYER_INDEX'] = index
+        tmp_df['BEST_XI'] = 0
         df = pd.concat([df, tmp_df], ignore_index=True)
         # print(tmp_df)
-        print(tmp_pop_database)
+        # print(tmp_pop_database)
         tmp_pop_database["PLAYER_INDEX"] = int(index)
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
 
@@ -306,16 +323,28 @@ else:
 if not get_real_data:
     df.to_csv("dataframe-test.csv", index=False)
 
-df2.to_csv("dataframe2-test.csv", index=True)
+# transform
+df2[["CLUB", "POSITION"]] = df2['club_position'].str.split(',', expand=True)
+df2["POSITION"] = df2["POSITION"].str.strip()
+df2["POPULARITY"] = df2['popularity'].str.split(')', n=1).str[0]
+df2["POPULARITY"] = df2['POPULARITY'].str.split('(', n=1).str[1]
+df2["DATE"] = formatted_date
+del df2["popularity"]
+del df2["club_position"]
+df2=df2.rename(columns={"name": "NAME", "price" : "PRICE", "country" : "COUNTRY", "previous_club" : "PREVIOUS_CLUB", "sum_points" : "SUM_POINTS",
+                        "sum_goals" : "SUM_GOALS", "sum_assists" : "SUM_ASSISSTS"})
+df2.to_csv("dataframe2-test.csv", index=False)
 
-# TRANSFORM
 
-# transform details
-# transform popularity
-
+for player in current_players:
+    if player[2] in cp:
+        add_players_to_database([player[2], player[0], player[1], formatted_date])
+    else:
+        update_players_to_database([player[0], player[1], formatted_date, player[2]])
 # LOAD
 
-
+add_or_update_details(df)
+add_or_update_popularity(df2)
 """
 df = scrap_data()
 print(df)
