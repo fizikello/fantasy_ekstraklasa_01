@@ -19,7 +19,7 @@ get_real_data = True
 def add_or_update_details(df):
 
     engine = create_engine(f'postgresql+psycopg2://{s.user}:{s.password}@{s.host}:{s.port}/{s.dbname}')
-    df.to_sql(name='details', con=engine, if_exists='append', index=False)
+    df.to_sql(name='details_t01', con=engine, if_exists='append', index=False)
 
 
 def add_or_update_popularity(df):
@@ -33,10 +33,10 @@ def add_details_to_database(row_data):
         connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
         # print(f"Connected to the database {s.dbname}")
         cursor = connection.cursor()
-        sql_command = f'INSERT INTO players ("WEEKDAY","OPPOSITE_TEAM","MINUTES_PLAYED","GOALS_SCORED","ASSISTS",' \
+        sql_command = f'INSERT INTO details_t01 ("WEEKDAY","OPPOSITE_TEAM","MINUTES_PLAYED","GOALS_SCORED","ASSISTS",' \
                       f'"ASSISTS_LOTTO","OWN_GOALS","PENALTIES_SCORED","PENALTIES_GAINED","PENALTIES_LOST",' \
                       f'"PENALTIES_MISSED","PENALTIES_SAVED","BEST_XI","YELLOW_CARDS","RED_CARDS","POINTS",' \
-                      f'"PLAYER_INDEX") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
+                      f'"PLAYER_INDEX", "DATE") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);'
         cursor.execute(sql_command, row_data)
         connection.commit()
 
@@ -176,8 +176,12 @@ def get_new_players():
                                    "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/mat-form-field[2]/div/div[1]/div[1]/input")
     password.send_keys(s.fantasy_password)
     driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
-    make_transfer_button = WebDriverWait(driver, 50).until(EC.element_to_be_clickable((By.XPATH,
-                                                                                       "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[1]/div/div/button"))).click()
+    # make_transfer_button =
+    WebDriverWait(driver, 50).until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[2]/div/div/button"))).click()
+
+    #time.sleep(5)
+    # make_transfer_button = driver.find_element(By.XPATH, "//button[text()='Zrób transfery']").click()
+
     players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
     # players_table = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[1]/div/div/button")))
     time.sleep(5)
@@ -310,11 +314,16 @@ if get_real_data_2:
         tmp_df=tmp_df.rename(columns=new_column_names)
         tmp_df['PLAYER_INDEX'] = index
         tmp_df['BEST_XI'] = 0
+        tmp_df["DATE"] = formatted_date
         df = pd.concat([df, tmp_df], ignore_index=True)
         # print(tmp_df)
         # print(tmp_pop_database)
         tmp_pop_database["PLAYER_INDEX"] = int(index)
+        #tmp_pop_database["DATE"] = formatted_date
+        print(formatted_date)
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
+        print(df2)
+
 
 else:
     df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
@@ -343,8 +352,11 @@ for player in current_players:
         update_players_to_database([player[0], player[1], formatted_date, player[2]])
 # LOAD
 
+
 add_or_update_details(df)
+print("details_ok")
 add_or_update_popularity(df2)
+print("popularity ok")
 """
 df = scrap_data()
 print(df)
