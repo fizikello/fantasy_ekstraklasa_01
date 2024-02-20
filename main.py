@@ -260,6 +260,12 @@ def compare_lists(current_list, archive_list):
     return result_list
 
 
+def check_number_of_players(players_list):
+    if len(players_list) < 400:
+        print(f"Only {len(players_list)} found")
+        exit()
+
+
 # connect_to_database()
 m = Marks()
 s = Secrets()
@@ -277,7 +283,7 @@ cp = compare_lists(current_list=current_indexes, archive_list=archive_players_li
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
 current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
 # print(f"current_players: {current_players}")
-print(f"Players found: {len(current_players)}")
+check_number_of_players(current_players)
 
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
