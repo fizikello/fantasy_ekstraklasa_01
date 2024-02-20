@@ -177,10 +177,8 @@ def get_new_players():
     password.send_keys(s.fantasy_password)
     driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
     # make_transfer_button =
-    WebDriverWait(driver, 50).until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[2]/div/div/button"))).click()
-
-    #time.sleep(5)
-    # make_transfer_button = driver.find_element(By.XPATH, "//button[text()='Zrób transfery']").click()
+    WebDriverWait(driver, 50).until(EC.element_to_be_clickable((By.XPATH,
+                                                                "//button[contains(text(),'Zrób transfery')]"))).click()
 
     players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
     # players_table = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[1]/div/div/button")))
@@ -271,18 +269,15 @@ chrome_options.add_experimental_option("detach", True)
 driver = webdriver.Chrome()
 
 archive_players_list = get_players_from_database()
-# print(archive_players_list)
 current_players_list = get_new_players() if get_real_data else get_test_list()
-# print(current_players_list)
-
 current_indexes = [int(row.split(':')[1]) for row in current_players_list]
-# print(current_indexes)
 
 cp = compare_lists(current_list=current_indexes, archive_list=archive_players_list)
 
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
 current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
-print(f"current_players: {current_players}")
+# print(f"current_players: {current_players}")
+print(f"Players found: {len(current_players)}")
 
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
@@ -324,7 +319,6 @@ if get_real_data_2:
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
         print(df2)
 
-
 else:
     df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
     print(df)
@@ -344,7 +338,6 @@ df2=df2.rename(columns={"name": "NAME", "price" : "PRICE", "country" : "COUNTRY"
                         "sum_goals" : "SUM_GOALS", "sum_assists" : "SUM_ASSISSTS"})
 df2.to_csv("dataframe2-test.csv", index=False)
 
-
 for player in current_players:
     if player[2] in cp:
         add_players_to_database([player[2], player[0], player[1], formatted_date])
@@ -352,12 +345,7 @@ for player in current_players:
         update_players_to_database([player[0], player[1], formatted_date, player[2]])
 # LOAD
 
-
 add_or_update_details(df)
 print("details_ok")
 add_or_update_popularity(df2)
 print("popularity ok")
-"""
-df = scrap_data()
-print(df)
-"""
