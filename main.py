@@ -12,6 +12,9 @@ from hidden_values import Secrets
 from marks import Marks
 import psycopg2
 from sqlalchemy import create_engine
+from bs4 import BeautifulSoup
+import requests
+from selenium.webdriver.chrome.options import Options
 
 get_real_data = True
 
@@ -159,16 +162,22 @@ def connect_to_database():
 def get_new_players():
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_experimental_option("detach", True)
+    # chrome_options.add_argument('window-size=1920x1080')
     # driver = webdriver.Edge()
-    driver = webdriver.Chrome()
+    # driver = webdriver.Chrome()
+    #driver.set_window_size(690,912)
     start_date = time.time()
     driver.get(s.login_url)
     # test section
     # button_login = driver.find_element(By.CLASS_NAME,  ".btn btn-tertiary login btn-block pull-right")
 
     # live section
-    button_login = WebDriverWait(driver, 50).until(EC.element_to_be_clickable(
+    button_login = WebDriverWait(driver, 15).until(EC.element_to_be_clickable(
         (By.XPATH, "/html/body/div[1]/div[2]/header/div/div/div/div[2]/div/div/div[1]/a[1]"))).click()
+
+    #button_login = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH,
+    #                                                            "//button[contains(text(),'Zaloguj się')]"))).click()
+
     username = driver.find_element(By.XPATH,
                                    "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/mat-form-field[1]/div/div[1]/div/input")
     username.send_keys(s.fantasy_login)
@@ -176,9 +185,13 @@ def get_new_players():
                                    "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/mat-form-field[2]/div/div[1]/div[1]/input")
     password.send_keys(s.fantasy_password)
     driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
-    # make_transfer_button =
-    WebDriverWait(driver, 50).until(EC.element_to_be_clickable((By.XPATH,
-                                                                "//button[contains(text(),'Zrób transfery')]"))).click()
+
+    driver.set_window_size(1300, 800)
+    # make_transfer_button
+    WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[4]/div/div/button"))).click()
+
+    #WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,
+    #                                                            "//button[contains(text(),'Zrób transfery')]"))).click()
 
     players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
     # players_table = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[1]/div/div/button")))
@@ -199,17 +212,19 @@ def get_new_players():
 
 
 def scrap_data(path):
-    #chrome_options = webdriver.ChromeOptions()
-    #chrome_options.add_experimental_option("detach", True)
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--ignore-certificate-errors")
+    chrome_options.add_experimental_option("detach", True)
     # driver = webdriver.Edge()
-    #driver = webdriver.Chrome()
+    driver = webdriver.Chrome()
     driver.get(path)
-    time.sleep(1)
+    time.sleep(0.5)
     scrapped_values = dict()
     start_time = time.time()
     for key, mark in m.marks.items():
         try:
-            scrapped_values[key] = driver.find_element(By.XPATH, mark).text
+            # scrapped_values[key] = driver.find_element(By.XPATH, mark).text
+            scrapped_values[key] = WebDriverWait(driver, 20).until(EC.visibility_of_element_located((By.XPATH, mark))).text
         except NoSuchElementException:
             print(f"Not found {key} markup")
             exit()
@@ -245,6 +260,51 @@ def scrap_data(path):
     return spdf, scrapped_values
 
 
+def scrap_data_b(path):
+    response = requests.get(path, verify=False)
+    if response.status_code != 200:
+        print("Failed to fetch the page")
+        return None, None
+
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    scrapped_values = dict()
+    start_time = time.time()
+    for key, mark in m.marks.items():
+        element = soup.find('xpath', mark)
+        if element:
+            scrapped_values[key] = element.text
+            print(f"{key} : {scrapped_values[key]}")
+        else:
+            print(f"Not found {key} markup")
+            return None, None
+
+    try:
+        table = soup.find('xpath', m.table)
+        rows = table.find_all('tr')
+
+        data = []
+        column_names = [col.text for col in rows[0].find_all('td')]
+        column_names[-3] = "Yellow_Cards"
+        column_names[-2] = "Red_Cards"
+
+        for row in rows[1:]:
+            cols = row.find_all('td')
+            row_data = [col.text for col in cols]
+            if len(row_data) == 15:
+                row_data.insert(1, 'EMPTY')
+            data.append(row_data)
+
+        print(data)
+
+    except AttributeError:
+        print("table not found")
+        return None, None
+
+    spdf = pd.DataFrame(data, columns=column_names)
+
+    return spdf, scrapped_values
+
 def get_test_list():
 
     with open('test_players.txt', 'r', encoding='utf-8') as file:
@@ -273,7 +333,7 @@ chrome_options = webdriver.ChromeOptions()
 chrome_options.add_experimental_option("detach", True)
 # driver = webdriver.Edge()
 driver = webdriver.Chrome()
-
+#driver.set_window_size(1300, 800)
 archive_players_list = get_players_from_database()
 current_players_list = get_new_players() if get_real_data else get_test_list()
 current_indexes = [int(row.split(':')[1]) for row in current_players_list]
@@ -321,13 +381,13 @@ if get_real_data_2:
         # print(tmp_pop_database)
         tmp_pop_database["PLAYER_INDEX"] = int(index)
         #tmp_pop_database["DATE"] = formatted_date
-        print(formatted_date)
+        # print(formatted_date)
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
-        print(df2)
+        # print(df2)
 
 else:
     df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
-    print(df)
+    # print(df)
 
 if not get_real_data:
     df.to_csv("dataframe-test.csv", index=False)
