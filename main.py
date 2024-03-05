@@ -14,6 +14,7 @@ import psycopg2
 from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 import requests
+import warnings
 from selenium.webdriver.chrome.options import Options
 
 get_real_data = True
@@ -188,7 +189,7 @@ def get_new_players():
 
     driver.set_window_size(1300, 800)
     # make_transfer_button
-    WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[4]/div/div/button"))).click()
+    WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[5]/div/div/button"))).click()
 
     #WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,
     #                                                            "//button[contains(text(),'Zrób transfery')]"))).click()
@@ -212,13 +213,14 @@ def get_new_players():
 
 
 def scrap_data(path):
+    performance = time.time()
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_experimental_option("detach", True)
     # driver = webdriver.Edge()
     driver = webdriver.Chrome()
     driver.get(path)
-    time.sleep(0.5)
+    # time.sleep(0.5)
     scrapped_values = dict()
     start_time = time.time()
     for key, mark in m.marks.items():
@@ -257,52 +259,60 @@ def scrap_data(path):
     spdf = pd.DataFrame(data, columns=column_names)
     # spdf = spdf.fillna(value=0)
     # spdf["ELAPSED_TIME"] = round((time.time() - start_time), 2)
+    print(f"performance: {time.time() - performance}")
+
+    print(f"scrapped values: {scrapped_values}")
+
     return spdf, scrapped_values
 
 
 def scrap_data_b(path):
+    performance = time.time()
+    warnings.filterwarnings("ignore", message="Unverified HTTPS request")
     response = requests.get(path, verify=False)
     if response.status_code != 200:
         print("Failed to fetch the page")
         return None, None
 
     soup = BeautifulSoup(response.content, 'html.parser')
+    # print(soup)
 
     scrapped_values = dict()
     start_time = time.time()
-    for key, mark in m.marks.items():
-        element = soup.find('xpath', mark)
-        if element:
-            scrapped_values[key] = element.text
-            print(f"{key} : {scrapped_values[key]}")
-        else:
-            print(f"Not found {key} markup")
-            return None, None
 
-    try:
-        table = soup.find('xpath', m.table)
-        rows = table.find_all('tr')
+    scrapped_values['club_position'] = soup.find('div', class_='post-meta').text.strip()
+    scrapped_values['name'] = soup.find('h1').text.strip()
+    prize_check = soup.find_all('td', class_='sec')
+    scrapped_values['price'] = prize_check[0].text.strip()
+    scrapped_values['popularity'] = prize_check[1].text.strip()
+    scrapped_values['country'] = prize_check[2].text.strip()
+    scrapped_values['previous_club'] = prize_check[3].text.strip()
 
-        data = []
-        column_names = [col.text for col in rows[0].find_all('td')]
-        column_names[-3] = "Yellow_Cards"
-        column_names[-2] = "Red_Cards"
+    numbers_check = soup.find_all('div', class_='col-sm-7 col-xs-7 text-left')
+    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]
+    scrapped_values['sum_goals'] = numbers_check[1].text.strip().split('\n')[0]
+    scrapped_values['sum_assists'] = numbers_check[2].text.strip().split('\n')[0]
 
-        for row in rows[1:]:
-            cols = row.find_all('td')
-            row_data = [col.text for col in cols]
-            if len(row_data) == 15:
-                row_data.insert(1, 'EMPTY')
-            data.append(row_data)
+    data = []
+    table_rows = soup.find_all('tr')
 
-        print(data)
+    column_names = []
+    for row in table_rows[4:5]:
+        cells = row.find_all('td')
+        column_names = [cell.get_text(strip=True) for cell in cells]
+    column_names[-3] = "Yellow_Cards"
+    column_names[-2] = "Red_Cards"
 
-    except AttributeError:
-        print("table not found")
-        return None, None
+    for row in table_rows[5:]:
+        cells = row.find_all('td')
+        row_data = [cell.get_text(strip=True) for cell in cells]
+        if len(row_data) == 15:
+            row_data.insert(1, 'EMPTY')
+        #print(f"row data:{row_data}")
+        data.append(row_data)
 
     spdf = pd.DataFrame(data, columns=column_names)
-
+    print(f"performance: {time.time() - performance}")
     return spdf, scrapped_values
 
 def get_test_list():
@@ -343,18 +353,21 @@ cp = compare_lists(current_list=current_indexes, archive_list=archive_players_li
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
 current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
 # print(f"current_players: {current_players}")
-check_number_of_players(current_players)
+
+if get_real_data:
+    check_number_of_players(current_players)
 
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
 #print(formatted_date)
 
 # database -> players
-for player in current_players:
-    if player[2] in cp:
-        add_players_to_database([player[2], player[0], player[1], formatted_date])
-    else:
-        update_players_to_database([player[0], player[1], formatted_date, player[2]])
+#if get_real_data:
+#    for player in current_players:
+#        if player[2] in cp:
+#            add_players_to_database([player[2], player[0], player[1], formatted_date])
+#        else:
+#            update_players_to_database([player[0], player[1], formatted_date, player[2]])
 
 # scrap website
 df = pd.DataFrame()
@@ -365,25 +378,25 @@ if get_real_data_2:
     for index in current_indexes:
         print(f'{current_indexes.index(index)} : {index} ')
         path = s.login_url + "player/" + str(index)
-        #print(path)
-        tmp_df, tmp_pop_database = scrap_data(path)
-        # move to transform
+        #print('scrapping ...')
+        tmp_df, tmp_pop_database = scrap_data_b(path)
         new_column_names = {'Kol.':'WEEKDAY', 'Vs':"OPPOSITE_TEAM", 'Min.':"MINUTES_PLAYED", 'Br.':"GOALS_SCORED",
                             'As.':'ASSISTS', 'AL.':"ASSISTS_LOTTO", 'Br. sam.':'OWN_GOALS', 'Kar. wyk.':"PENALTIES_SCORED", 'Kar. wyw.':'PENALTIES_GAINED',
                             'Kar. spo.':'PENALTIES_LOST', 'Kar. zmar.':'PENALTIES_MISSED', 'Kar. obr.':'PENALTIES_SAVED', '11 kol.':"BEST_XI",
                             'Yellow_Cards':"YELLOW_CARDS", 'Red_Cards':'RED_CARDS', 'Pkt.':"POINTS"}
+        #print('loading to df ...')
         tmp_df=tmp_df.rename(columns=new_column_names)
         tmp_df['PLAYER_INDEX'] = index
         tmp_df['BEST_XI'] = 0
         tmp_df["DATE"] = formatted_date
+        #print(tmp_df)
         df = pd.concat([df, tmp_df], ignore_index=True)
-        # print(tmp_df)
-        # print(tmp_pop_database)
+        #print(tmp_pop_database)
         tmp_pop_database["PLAYER_INDEX"] = int(index)
         #tmp_pop_database["DATE"] = formatted_date
         # print(formatted_date)
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
-        # print(df2)
+        #print(df2)
 
 else:
     df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
@@ -393,6 +406,7 @@ if not get_real_data:
     df.to_csv("dataframe-test.csv", index=False)
 
 # transform
+print("Cleaning data")
 df2[["CLUB", "POSITION"]] = df2['club_position'].str.split(',', expand=True)
 df2["POSITION"] = df2["POSITION"].str.strip()
 df2["POPULARITY"] = df2['popularity'].str.split(')', n=1).str[0]
@@ -404,14 +418,17 @@ df2=df2.rename(columns={"name": "NAME", "price" : "PRICE", "country" : "COUNTRY"
                         "sum_goals" : "SUM_GOALS", "sum_assists" : "SUM_ASSISSTS"})
 df2.to_csv("dataframe2-test.csv", index=False)
 
-for player in current_players:
-    if player[2] in cp:
-        add_players_to_database([player[2], player[0], player[1], formatted_date])
-    else:
-        update_players_to_database([player[0], player[1], formatted_date, player[2]])
 # LOAD
+print("Loading data to database")
+if get_real_data:
 
-add_or_update_details(df)
-print("details_ok")
-add_or_update_popularity(df2)
-print("popularity ok")
+    for player in current_players:
+        if player[2] in cp:
+            add_players_to_database([player[2], player[0], player[1], formatted_date])
+        else:
+            update_players_to_database([player[0], player[1], formatted_date, player[2]])
+
+    add_or_update_details(df)
+    print("details_ok")
+    add_or_update_popularity(df2)
+    print("popularity ok")
