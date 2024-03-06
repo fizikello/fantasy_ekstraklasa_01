@@ -19,6 +19,9 @@ from selenium.webdriver.chrome.options import Options
 
 get_real_data = True
 
+def update_scrap_performance(df):
+    engine = create_engine(f'postgresql+psycopg2://{s.user}:{s.password}@{s.host}:{s.port}/{s.dbname}')
+    df.to_sql(name='scrap_performance', con=engine, if_exists='append', index=False)
 
 def add_or_update_details(df):
 
@@ -213,14 +216,13 @@ def get_new_players():
 
 
 def scrap_data(path):
-    performance = time.time()
+
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_experimental_option("detach", True)
     # driver = webdriver.Edge()
     driver = webdriver.Chrome()
     driver.get(path)
-    # time.sleep(0.5)
     scrapped_values = dict()
     start_time = time.time()
     for key, mark in m.marks.items():
@@ -253,21 +255,12 @@ def scrap_data(path):
     except NoSuchElementException:
         print("table not found")
 
-    #print(column_names)
-    #print(f"time: {round(time.time() - start_time),2}")
-
     spdf = pd.DataFrame(data, columns=column_names)
-    # spdf = spdf.fillna(value=0)
-    # spdf["ELAPSED_TIME"] = round((time.time() - start_time), 2)
-    print(f"performance: {time.time() - performance}")
-
-    print(f"scrapped values: {scrapped_values}")
 
     return spdf, scrapped_values
 
 
 def scrap_data_b(path):
-    performance = time.time()
     warnings.filterwarnings("ignore", message="Unverified HTTPS request")
     response = requests.get(path, verify=False)
     if response.status_code != 200:
@@ -275,11 +268,7 @@ def scrap_data_b(path):
         return None, None
 
     soup = BeautifulSoup(response.content, 'html.parser')
-    # print(soup)
-
     scrapped_values = dict()
-    start_time = time.time()
-
     scrapped_values['club_position'] = soup.find('div', class_='post-meta').text.strip()
     scrapped_values['name'] = soup.find('h1').text.strip()
     prize_check = soup.find_all('td', class_='sec')
@@ -287,7 +276,6 @@ def scrap_data_b(path):
     scrapped_values['popularity'] = prize_check[1].text.strip()
     scrapped_values['country'] = prize_check[2].text.strip()
     scrapped_values['previous_club'] = prize_check[3].text.strip()
-
     numbers_check = soup.find_all('div', class_='col-sm-7 col-xs-7 text-left')
     scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]
     scrapped_values['sum_goals'] = numbers_check[1].text.strip().split('\n')[0]
@@ -308,11 +296,9 @@ def scrap_data_b(path):
         row_data = [cell.get_text(strip=True) for cell in cells]
         if len(row_data) == 15:
             row_data.insert(1, 'EMPTY')
-        #print(f"row data:{row_data}")
         data.append(row_data)
 
     spdf = pd.DataFrame(data, columns=column_names)
-    print(f"performance: {time.time() - performance}")
     return spdf, scrapped_values
 
 def get_test_list():
@@ -359,19 +345,11 @@ if get_real_data:
 
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
-#print(formatted_date)
-
-# database -> players
-#if get_real_data:
-#    for player in current_players:
-#        if player[2] in cp:
-#            add_players_to_database([player[2], player[0], player[1], formatted_date])
-#        else:
-#            update_players_to_database([player[0], player[1], formatted_date, player[2]])
 
 # scrap website
 df = pd.DataFrame()
 df2 = pd.DataFrame(columns=['name', 'price', 'club_position', 'popularity', 'country', 'previous_club', 'sum_points', 'sum_goals', 'sum_assists'])
+time_df = pd.DataFrame(columns=['PLAYER_ID', 'TIME', 'DATE', 'TECHNOLOGY'])
 
 get_real_data_2 = True
 if get_real_data_2:
@@ -379,12 +357,13 @@ if get_real_data_2:
         print(f'{current_indexes.index(index)} : {index} ')
         path = s.login_url + "player/" + str(index)
         #print('scrapping ...')
+        time_0 = time.time()
         tmp_df, tmp_pop_database = scrap_data_b(path)
+        time_df.loc[len(time_df)] = [index, time.time() - time_0, formatted_date, 'beautiful soup']
         new_column_names = {'Kol.':'WEEKDAY', 'Vs':"OPPOSITE_TEAM", 'Min.':"MINUTES_PLAYED", 'Br.':"GOALS_SCORED",
                             'As.':'ASSISTS', 'AL.':"ASSISTS_LOTTO", 'Br. sam.':'OWN_GOALS', 'Kar. wyk.':"PENALTIES_SCORED", 'Kar. wyw.':'PENALTIES_GAINED',
                             'Kar. spo.':'PENALTIES_LOST', 'Kar. zmar.':'PENALTIES_MISSED', 'Kar. obr.':'PENALTIES_SAVED', '11 kol.':"BEST_XI",
                             'Yellow_Cards':"YELLOW_CARDS", 'Red_Cards':'RED_CARDS', 'Pkt.':"POINTS"}
-        #print('loading to df ...')
         tmp_df=tmp_df.rename(columns=new_column_names)
         tmp_df['PLAYER_INDEX'] = index
         tmp_df['BEST_XI'] = 0
@@ -432,3 +411,5 @@ if get_real_data:
     print("details_ok")
     add_or_update_popularity(df2)
     print("popularity ok")
+    update_scrap_performance(time_df)
+    print("scrap performance stats ok")
