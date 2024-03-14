@@ -190,9 +190,22 @@ def get_new_players():
     password.send_keys(s.fantasy_password)
     driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
 
-    driver.set_window_size(1300, 800)
+    print('wait ...')
+    time.sleep(5)
+    driver.get(s.login_url + "user-team/transfer")
+    time.sleep(5)
+    #driver.set_window_size(1300, 800)
     # make_transfer_button
-    WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[5]/div/div/button"))).click()
+    button_text = 'Zrób transfery'
+    #for button in WebDriverWait(driver, 20).until(EC.visibility_of_all_elements_located((By.PARTIAL_LINK_TEXT, 'Zr'))):
+    #    button.click()
+
+    #time.sleep(5)
+
+    # WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[5]/div/div/button"))).click()
+
+    #except NoSuchElementException:
+     #       WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[3]/div[2]/div[1]/div/div/div/div[1]/div/div[6]/div/div/button[1]"))).click()
 
     #WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,
     #                                                            "//button[contains(text(),'Zrób transfery')]"))).click()
@@ -207,11 +220,11 @@ def get_new_players():
         data_info_id = element_button.get_attribute('data-info-id')
         players_list.append(f"{row.text}:{data_info_id}")
 
-    print(f"get_players_id time: {time.time() - start_date}")
-    time.sleep(1)
+    print(f"get_players_id time: {round(time.time() - start_date, 2)}")
+    # time.sleep(1)
     driver.quit()
 
-    print(f"Liczba graczy: {len(players_list)}")
+    print(f"# of players: {len(players_list)}")
     return players_list
 
 
@@ -338,7 +351,6 @@ cp = compare_lists(current_list=current_indexes, archive_list=archive_players_li
 
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
 current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
-# print(f"current_players: {current_players}")
 
 if get_real_data:
     check_number_of_players(current_players)
@@ -346,7 +358,6 @@ if get_real_data:
 today = date.today()
 formatted_date = today.strftime('%Y%m%d')
 
-# scrap website
 df = pd.DataFrame()
 df2 = pd.DataFrame(columns=['name', 'price', 'club_position', 'popularity', 'country', 'previous_club', 'sum_points', 'sum_goals', 'sum_assists'])
 time_df = pd.DataFrame(columns=['PLAYER_ID', 'TIME', 'DATE', 'TECHNOLOGY'])
@@ -356,7 +367,6 @@ if get_real_data_2:
     for index in current_indexes:
         print(f'{current_indexes.index(index)} : {index} ')
         path = s.login_url + "player/" + str(index)
-        #print('scrapping ...')
         time_0 = time.time()
         tmp_df, tmp_pop_database = scrap_data_b(path)
         time_df.loc[len(time_df)] = [index, time.time() - time_0, formatted_date, 'beautiful soup']
@@ -368,18 +378,12 @@ if get_real_data_2:
         tmp_df['PLAYER_INDEX'] = index
         tmp_df['BEST_XI'] = 0
         tmp_df["DATE"] = formatted_date
-        #print(tmp_df)
         df = pd.concat([df, tmp_df], ignore_index=True)
-        #print(tmp_pop_database)
         tmp_pop_database["PLAYER_INDEX"] = int(index)
-        #tmp_pop_database["DATE"] = formatted_date
-        # print(formatted_date)
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
-        #print(df2)
 
 else:
     df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
-    # print(df)
 
 if not get_real_data:
     df.to_csv("dataframe-test.csv", index=False)
