@@ -1,5 +1,5 @@
 import time
-from datetime import date
+from datetime import datetime
 import re
 import pandas as pd
 from selenium import webdriver
@@ -190,28 +190,13 @@ def get_new_players():
     password.send_keys(s.fantasy_password)
     driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
 
-    print('wait ...')
-    time.sleep(5)
-    driver.get(s.login_url + "user-team/transfer")
-    time.sleep(5)
-    #driver.set_window_size(1300, 800)
-    # make_transfer_button
-    button_text = 'Zrób transfery'
-    #for button in WebDriverWait(driver, 20).until(EC.visibility_of_all_elements_located((By.PARTIAL_LINK_TEXT, 'Zr'))):
-    #    button.click()
+    time.sleep(5) # check to load -> test second loading page
+    next_link = s.login_url + "user-team/transfer"
+    driver.get(next_link)
+    print(f'response from {next_link}')
 
-    #time.sleep(5)
-
-    # WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,"/html/body/div[1]/div[2]/div[2]/div/div[2]/div[1]/div/div/div/div[1]/div/div[5]/div/div/button"))).click()
-
-    #except NoSuchElementException:
-     #       WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[3]/div[2]/div[1]/div/div/div/div[1]/div/div[6]/div/div/button[1]"))).click()
-
-    #WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.XPATH,
-    #                                                            "//button[contains(text(),'Zrób transfery')]"))).click()
-
+    check_player_table = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")))
     players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
-    # players_table = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div/div/div[1]/div/div[1]/div/div/button")))
     time.sleep(5)
     players_list = []
     rows = players_table.find_elements(By.TAG_NAME, "tr")
@@ -221,7 +206,6 @@ def get_new_players():
         players_list.append(f"{row.text}:{data_info_id}")
 
     print(f"get_players_id time: {round(time.time() - start_date, 2)}")
-    # time.sleep(1)
     driver.quit()
 
     print(f"# of players: {len(players_list)}")
@@ -355,8 +339,9 @@ current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in
 if get_real_data:
     check_number_of_players(current_players)
 
-today = date.today()
-formatted_date = today.strftime('%Y%m%d')
+today = datetime.now()
+formatted_date = today.strftime('%Y%m%d%H%M')
+# formatted_date = today.strftime('%Y%m%d')
 
 df = pd.DataFrame()
 df2 = pd.DataFrame(columns=['name', 'price', 'club_position', 'popularity', 'country', 'previous_club', 'sum_points', 'sum_goals', 'sum_assists'])
