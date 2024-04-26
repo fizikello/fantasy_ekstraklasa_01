@@ -257,7 +257,7 @@ def scrap_data(path):
     return spdf, scrapped_values
 
 
-def scrap_data_b(path):
+def scrap_data_b(path, index):
     warnings.filterwarnings("ignore", message="Unverified HTTPS request")
     response = requests.get(path, verify=False)
     if response.status_code != 200:
@@ -353,7 +353,7 @@ if get_real_data_2:
         print(f'{current_indexes.index(index)} : {index} ')
         path = s.login_url + "player/" + str(index)
         time_0 = time.time()
-        tmp_df, tmp_pop_database = scrap_data_b(path)
+        tmp_df, tmp_pop_database = scrap_data_b(path, index)
         time_df.loc[len(time_df)] = [index, time.time() - time_0, formatted_date, 'beautiful soup']
         new_column_names = {'Kol.':'WEEKDAY', 'Vs':"OPPOSITE_TEAM", 'Min.':"MINUTES_PLAYED", 'Br.':"GOALS_SCORED",
                             'As.':'ASSISTS', 'AL.':"ASSISTS_LOTTO", 'Br. sam.':'OWN_GOALS', 'Kar. wyk.':"PENALTIES_SCORED", 'Kar. wyw.':'PENALTIES_GAINED',
