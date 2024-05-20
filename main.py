@@ -114,7 +114,6 @@ def get_players_from_database():
         connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
         print(f"Connected to the database {s.dbname}")
         cursor = connection.cursor()
-        # sql_command = 'SELECT DISTINCT "ID" FROM players;'
         sql_command = 'SELECT DISTINCT "ID" from players where "UPDATE_DATE" = (SELECT MAX("UPDATE_DATE") as m_ FROM players);'
         cursor.execute(sql_command)
         results = [entry[0] for entry in cursor.fetchall()]
