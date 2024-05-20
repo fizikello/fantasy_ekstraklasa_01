@@ -8,6 +8,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 from hidden_values import Secrets
 from marks import Marks
 import psycopg2
@@ -113,9 +114,11 @@ def get_players_from_database():
         connection = psycopg2.connect(dbname=s.dbname, user=s.user, password=s.password, host=s.host, port=s.port)
         print(f"Connected to the database {s.dbname}")
         cursor = connection.cursor()
-        sql_command = 'SELECT DISTINCT "ID" FROM players;'
+        # sql_command = 'SELECT DISTINCT "ID" FROM players;'
+        sql_command = 'SELECT DISTINCT "ID" from players where "UPDATE_DATE" = (SELECT MAX("UPDATE_DATE") as m_ FROM players);'
         cursor.execute(sql_command)
         results = [entry[0] for entry in cursor.fetchall()]
+        print(f"archive player list equals {len(results)} players")
         return results
 
     except psycopg2.Error as e:
@@ -328,15 +331,25 @@ chrome_options.add_experimental_option("detach", True)
 driver = webdriver.Chrome()
 #driver.set_window_size(1300, 800)
 archive_players_list = get_players_from_database()
-current_players_list = get_new_players() if get_real_data else get_test_list()
-current_indexes = [int(row.split(':')[1]) for row in current_players_list]
+current_player_list = []
+current_player_indexes = []
+archive_loader = False
+try:
+    current_players_list = get_new_players() if get_real_data else get_test_list()
+    current_indexes = [int(row.split(':')[1]) for row in current_players_list]
+except (TimeoutException, NoSuchElementException) as e1:
+    archive_loader = True
+    current_indexes = archive_players_list
+    print("Could not to update update transfer list. Archive list has been loaded.")
 
 cp = compare_lists(current_list=current_indexes, archive_list=archive_players_list)
 
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
-current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
+current_players = []
+if archive_loader is False:
+    current_players = [(re.split(r'\d', row)[0].split("(")[0][:-1], True if "(M)" in row else False, int(row.split(':')[1])) for row in current_players_list]
 
-if get_real_data:
+if get_real_data and archive_loader is False:
     check_number_of_players(current_players)
 
 today = datetime.now()
