@@ -341,6 +341,9 @@ except (TimeoutException, NoSuchElementException) as e1:
     current_indexes = archive_players_list
     print("Could not to update update transfer list. Archive list has been loaded.")
 
+if archive_loader and input("Continue? (Y/n)") != "Y":
+    exit()
+
 cp = compare_lists(current_list=current_indexes, archive_list=archive_players_list)
 
 # transform current_players_list -> SHORT_NAME, IS_YOUNG, ID
