@@ -91,6 +91,11 @@ def update_players_to_database(row_data):
         sql_command = f'UPDATE players SET "LAST_NAME"= %s, "YOUNG_PLAYER"=%s, "UPDATE_DATE"=%s WHERE "ID"=%s;'
         cursor.execute(sql_command, row_data)
         connection.commit()
+
+        if cursor.rowcount == 0:
+            return False
+
+        return True
         #sql_command = "SELECT * FROM players;"
         #cursor.execute(sql_command)
         #results = cursor.fetchall()
@@ -100,6 +105,7 @@ def update_players_to_database(row_data):
     except psycopg2.Error as e:
         print(f"Unable to connect to the database {s.dbname}")
         print(e)
+        return False
 
     finally:
         if cursor:
@@ -115,6 +121,7 @@ def get_players_from_database():
         print(f"Connected to the database {s.dbname}")
         cursor = connection.cursor()
         sql_command = 'SELECT DISTINCT "ID" from players where "UPDATE_DATE" = (SELECT MAX("UPDATE_DATE") as m_ FROM players);'
+        # sql_command = 'SELECT DISTINCT "ID" from players;  # where "UPDATE_DATE" = (SELECT MAX("UPDATE_DATE") as m_ FROM players);'
         cursor.execute(sql_command)
         results = [entry[0] for entry in cursor.fetchall()]
         print(f"archive player list equals {len(results)} players")
@@ -196,6 +203,7 @@ def get_new_players():
     next_link = s.login_url + "user-team/transfer"
     driver.get(next_link)
     print(f'response from {next_link}')
+    driver.get(next_link)
 
     check_player_table = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")))
     players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
@@ -405,11 +413,17 @@ df2.to_csv("dataframe2-test.csv", index=False)
 print("Loading data to database")
 if get_real_data:
 
-    for player in current_players:
+    """for player in current_players:
         if player[2] in cp:
             add_players_to_database([player[2], player[0], player[1], formatted_date])
         else:
             update_players_to_database([player[0], player[1], formatted_date, player[2]])
+            """
+    for player in current_players:
+        update_successful = update_players_to_database([player[0], player[1], formatted_date, player[2]])
+
+        if not update_successful:
+            add_players_to_database([player[2], player[0], player[1], formatted_date])
 
     add_or_update_details(df)
     print("details_ok")
