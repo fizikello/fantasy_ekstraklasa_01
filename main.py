@@ -28,6 +28,7 @@ def add_or_update_details(df):
 
     engine = create_engine(f'postgresql+psycopg2://{s.user}:{s.password}@{s.host}:{s.port}/{s.dbname}')
     df.to_sql(name='details_t01', con=engine, if_exists='append', index=False)
+    print("details_ok")
 
 
 def add_or_update_popularity(df):
@@ -435,7 +436,6 @@ if get_real_data:
             add_players_to_database([player[2], player[0], player[1], formatted_date])
 
     add_or_update_details(df)
-    print("details_ok")
     add_or_update_popularity(df2)
     print("popularity ok")
     update_scrap_performance(time_df)
