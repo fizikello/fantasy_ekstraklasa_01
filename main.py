@@ -329,6 +329,14 @@ def check_number_of_players(players_list):
         exit()
 
 
+def progress_bar(current, total, bar_length=20):
+    fraction = current / total
+    arrow = int(fraction * bar_length - 1) * '-' + '>'
+    padding = int(bar_length - len(arrow)) * ' '
+
+    return f'Progress: [{arrow}{padding}] {int(fraction*100)}% '
+
+
 # connect_to_database()
 m = Marks()
 s = Secrets()
@@ -373,7 +381,8 @@ time_df = pd.DataFrame(columns=['PLAYER_ID', 'TIME', 'DATE', 'TECHNOLOGY'])
 get_real_data_2 = True
 if get_real_data_2:
     for index in current_indexes:
-        print(f'{current_indexes.index(index)} : {index} ')
+        # print(f'{current_indexes.index(index)} : {index} ')
+        print(f"\r{index} : {progress_bar(current_indexes.index(index), len(current_indexes))}", end='', flush=True)
         path = s.login_url + "player/" + str(index)
         time_0 = time.time()
         tmp_df, tmp_pop_database = scrap_data_b(path, index)
