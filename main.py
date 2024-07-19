@@ -383,15 +383,15 @@ get_real_data_2 = True
 if get_real_data_2:
     for index in current_indexes:
         # print(f'{current_indexes.index(index)} : {index} ')
-        print(f"\r{index} : {progress_bar(current_indexes.index(index), len(current_indexes))}", end='', flush=True)
+        print(f"\r{progress_bar(current_indexes.index(index), len(current_indexes))}:{index}", end='', flush=True)
         path = s.login_url + "player/" + str(index)
         time_0 = time.time()
         tmp_df, tmp_pop_database = scrap_data_b(path, index)
         time_df.loc[len(time_df)] = [index, time.time() - time_0, formatted_date, 'beautiful soup']
-        new_column_names = {'Kol.':'WEEKDAY', 'Vs':"OPPOSITE_TEAM", 'Min.':"MINUTES_PLAYED", 'Br.':"GOALS_SCORED",
-                            'As.':'ASSISTS', 'AL.':"ASSISTS_LOTTO", 'Br. sam.':'OWN_GOALS', 'Kar. wyk.':"PENALTIES_SCORED", 'Kar. wyw.':'PENALTIES_GAINED',
-                            'Kar. spo.':'PENALTIES_LOST', 'Kar. zmar.':'PENALTIES_MISSED', 'Kar. obr.':'PENALTIES_SAVED', '11 kol.':"BEST_XI",
-                            'Yellow_Cards':"YELLOW_CARDS", 'Red_Cards':'RED_CARDS', 'Pkt.':"POINTS"}
+        new_column_names = {'Kol.': 'WEEKDAY', 'Vs': "OPPOSITE_TEAM", 'Min.': "MINUTES_PLAYED", 'Br.': "GOALS_SCORED",
+                            'As.': 'ASSISTS', 'AL.': "ASSISTS_LOTTO", 'Br. sam.': 'OWN_GOALS', 'Kar. wyk.': "PENALTIES_SCORED", 'Kar. wyw.': 'PENALTIES_GAINED',
+                            'Kar. spo.': 'PENALTIES_LOST', 'Kar. zmar.': 'PENALTIES_MISSED', 'Kar. obr.': 'PENALTIES_SAVED', '11 kol.': "BEST_XI",
+                            'Yellow_Cards': "YELLOW_CARDS", 'Red_Cards': 'RED_CARDS', 'Pkt.': "POINTS"}
         tmp_df=tmp_df.rename(columns=new_column_names)
         tmp_df['PLAYER_INDEX'] = index
         tmp_df['BEST_XI'] = 0
