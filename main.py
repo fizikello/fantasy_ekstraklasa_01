@@ -285,7 +285,8 @@ def scrap_data_b(path, index):
     scrapped_values['country'] = prize_check[2].text.strip()
     scrapped_values['previous_club'] = prize_check[3].text.strip()
     numbers_check = soup.find_all('div', class_='col-sm-7 col-xs-7 text-left')
-    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]
+    # exceptions= for one player "ID"=2150 -> check him before next run
+    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0] if index != 2150 else 0
     scrapped_values['sum_goals'] = numbers_check[1].text.strip().split('\n')[0]
     scrapped_values['sum_assists'] = numbers_check[2].text.strip().split('\n')[0]
 
@@ -423,12 +424,6 @@ df2.to_csv("dataframe2-test.csv", index=False)
 print("Loading data to database")
 if get_real_data:
 
-    """for player in current_players:
-        if player[2] in cp:
-            add_players_to_database([player[2], player[0], player[1], formatted_date])
-        else:
-            update_players_to_database([player[0], player[1], formatted_date, player[2]])
-            """
     for player in current_players:
         update_successful = update_players_to_database([player[0], player[1], formatted_date, player[2]])
 
