@@ -184,9 +184,9 @@ def get_new_players():
     driver.get(s.login_url)
     # test section
     # button_login = driver.find_element(By.CLASS_NAME,  ".btn btn-tertiary login btn-block pull-right")
-
+    time.sleep(10) # Cookie exception
     # live section
-    button_login = WebDriverWait(driver, 15).until(EC.element_to_be_clickable(
+    button_login = WebDriverWait(driver, 30).until(EC.element_to_be_clickable(
         (By.XPATH, "/html/body/div[1]/div[2]/header/div/div/div/div[2]/div/div/div[1]/a[1]"))).click()
 
     #button_login = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH,
@@ -286,7 +286,7 @@ def scrap_data_b(path, index):
     scrapped_values['previous_club'] = prize_check[3].text.strip()
     numbers_check = soup.find_all('div', class_='col-sm-7 col-xs-7 text-left')
     # exceptions= for one player "ID"=2150 -> check him before next run
-    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0] if index != 2150 else 0
+    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]  # if index not in ( 1444, 1739 ) else 0
     scrapped_values['sum_goals'] = numbers_check[1].text.strip().split('\n')[0]
     scrapped_values['sum_assists'] = numbers_check[2].text.strip().split('\n')[0]
 
@@ -301,18 +301,19 @@ def scrap_data_b(path, index):
     column_names[-2] = "Red_Cards"
 
     for row in table_rows[5:]:
-        cells = row.find_all('td')
-        row_data = [cell.get_text(strip=True) for cell in cells]
-        if len(row_data) == 15:
-            row_data.insert(1, 'EMPTY')
-        data.append(row_data)
+        if not row.find('td', class_='white'): # class='white' - pomijamy pliki cookies
+            cells = row.find_all('td')
+            row_data = [cell.get_text(strip=True) for cell in cells]
+            if len(row_data) == 15:
+                row_data.insert(1, 'EMPTY')
+            data.append(row_data)
 
     spdf = pd.DataFrame(data, columns=column_names)
     return spdf, scrapped_values
 
 def get_test_list():
 
-    with open('test_players.txt', 'r', encoding='utf-8') as file:
+    with open('../../OneDrive - Eviden/old_laptop/PycharmProjects/fantasy_ekstraklasa_01/test_players.txt', 'r', encoding='utf-8') as file:
         file_content = file.read().splitlines()
 
     restored_list = list(map(str, file_content))
@@ -402,7 +403,7 @@ if get_real_data_2:
         df2 = pd.concat([df2, pd.DataFrame(tmp_pop_database, index=[index])], ignore_index=True)
 
 else:
-    df = pd.read_csv(filepath_or_buffer="dataframe-test.csv")
+    df = pd.read_csv(filepath_or_buffer="../../OneDrive - Eviden/old_laptop/PycharmProjects/fantasy_ekstraklasa_01/dataframe-test.csv")
 
 if not get_real_data:
     df.to_csv("dataframe-test.csv", index=False)
@@ -421,6 +422,10 @@ df2=df2.rename(columns={"name": "NAME", "price" : "PRICE", "country" : "COUNTRY"
 df2.to_csv("dataframe2-test.csv", index=False)
 
 # LOAD
+df.to_csv("details.csv", index = False)
+df2.to_csv("popularity.csv", index=False)
+time_df.to_csv("scrap_time.csv", index=False)
+
 print("Loading data to database")
 if get_real_data:
 
