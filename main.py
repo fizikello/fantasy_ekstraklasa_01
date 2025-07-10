@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from bs4 import BeautifulSoup
 import requests
 import warnings
+from tqdm import tqdm
 from selenium.webdriver.chrome.options import Options
 
 get_real_data = True
@@ -184,31 +185,37 @@ def get_new_players():
     driver.get(s.login_url)
     # test section
     # button_login = driver.find_element(By.CLASS_NAME,  ".btn btn-tertiary login btn-block pull-right")
-    time.sleep(10) # Cookie exception
     # live section
-    button_login = WebDriverWait(driver, 30).until(EC.element_to_be_clickable(
-        (By.XPATH, "/html/body/div[1]/div[2]/header/div/div/div/div[2]/div/div/div[1]/a[1]"))).click()
+    button_cookies = WebDriverWait(driver, 10).until(EC.element_to_be_clickable(
+        (By.LINK_TEXT, "ZAPISZ"))).click()
+    # live section
+    button_login = WebDriverWait(driver, 100).until(EC.element_to_be_clickable(
+        (By.LINK_TEXT, "ZALOGUJ SIĘ"))).click()
 
     #button_login = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH,
     #                                                            "//button[contains(text(),'Zaloguj się')]"))).click()
 
-    username = driver.find_element(By.XPATH,
-                                   "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/mat-form-field[1]/div/div[1]/div/input")
+    username = driver.find_element(By.ID,
+                                   "mat-input-0")
     username.send_keys(s.fantasy_login)
-    password = driver.find_element(By.XPATH,
-                                   "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/mat-form-field[2]/div/div[1]/div[1]/input")
+    password = driver.find_element(By.ID,
+                                   "mat-input-1")
     password.send_keys(s.fantasy_password)
-    driver.find_element(By.XPATH, "/html/body/app-root/app-sign-in/div/app-sign-in-form/form/button[1]").click()
 
-    time.sleep(5) # check to load -> test second loading page
+    button_login = WebDriverWait(driver, 5).until(EC.element_to_be_clickable(
+        (By.CLASS_NAME, "mdc-button__label"))).click()
+
+    time.sleep(1) # check to load -> test second loading page
     next_link = s.login_url + "user-team/transfer"
     driver.get(next_link)
     print(f'response from {next_link}')
     driver.get(next_link)
 
-    check_player_table = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")))
-    players_table = driver.find_element(By.XPATH, "/html/body/div[1]/div[2]/div[2]/div[2]/div[2]/div[2]/div/div[1]")
-    time.sleep(5)
+    check_player_table = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.ID, "players-list-container")))
+    players_table = driver.find_element(By.ID, "players-list-container")
+
+    print(players_table)
+    time.sleep(1)
     players_list = []
     rows = players_table.find_elements(By.TAG_NAME, "tr")
     for row in rows[1:]:
@@ -286,7 +293,7 @@ def scrap_data_b(path, index):
     scrapped_values['previous_club'] = prize_check[3].text.strip()
     numbers_check = soup.find_all('div', class_='col-sm-7 col-xs-7 text-left')
     # exceptions= for one player "ID"=2150 -> check him before next run
-    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]  # if index not in ( 1444, 1739 ) else 0
+    scrapped_values['sum_points'] = numbers_check[0].text.strip().split('\n')[0]   if index not in ( 2105, ) else 0
     scrapped_values['sum_goals'] = numbers_check[1].text.strip().split('\n')[0]
     scrapped_values['sum_assists'] = numbers_check[2].text.strip().split('\n')[0]
 
@@ -383,9 +390,9 @@ time_df = pd.DataFrame(columns=['PLAYER_ID', 'TIME', 'DATE', 'TECHNOLOGY'])
 
 get_real_data_2 = True
 if get_real_data_2:
-    for index in current_indexes:
+    for index in tqdm(current_indexes):
         # print(f'{current_indexes.index(index)} : {index} ')
-        print(f"\r{progress_bar(current_indexes.index(index), len(current_indexes))}:{index}", end='', flush=True)
+        # print(f"\r{progress_bar(current_indexes.index(index), len(current_indexes))}:{index}", end='', flush=True)
         path = s.login_url + "player/" + str(index)
         time_0 = time.time()
         tmp_df, tmp_pop_database = scrap_data_b(path, index)
@@ -425,6 +432,7 @@ df2.to_csv("dataframe2-test.csv", index=False)
 df.to_csv("details.csv", index = False)
 df2.to_csv("popularity.csv", index=False)
 time_df.to_csv("scrap_time.csv", index=False)
+
 
 print("Loading data to database")
 if get_real_data:
